@@ -24,8 +24,14 @@ void HandleJump(void);
 void DrawText(const char* text, float x, float y);
 void DrawStartScreen(void);
 void DrawGameOverScreen(void);
+void DrawGameWonScreen(void);
+void updateTimer(void);
+void drawTimer(void);
+void handleSpeedupWithTime(void);
 void StartGame();
 void RestartGame();
+void DrawPowerUp(float x, float y, float size);
+void DrawCollectible(float x, float y, float radius);
 
 // Global Variables
 int windowWidth = 1200;
@@ -50,17 +56,36 @@ float obstacleHeight = 40;
 float obstacleSpeed = 0.1f;
 
 // Second Obstacle position and size
-float obstacle2X = windowWidth + 50;  // Starts off-screen to the right
-float obstacle2Y = 70;           // Set this to be above the first obstacle
+float obstacle2X = windowWidth + 300;  // Starts off-screen to the right
+float obstacle2Y = 90;           // Set this to be above the first obstacle
 float obstacle2Width = 30;
-float obstacle2Height = 40;
+float obstacle2Height = 110;
 float obstacle2Speed = 0.1f;      // Same speed for consistency
 
+float collectibleX = 300;      // X position of the collectible
+float collectibleY = 200;      // Y position of the collectible
+float collectibleWidth = 20;   // Width of the collectible
+float collectibleHeight = 20;  // Height of the collectible
+float collectibleSpeed = 0.1f; // Speed at which the collectible moves
 
+float powerUpX = 500;          // X position of the power-up
+float powerUpY = 200;          // Y position of the power-up
+float powerUpWidth = 30;       // Width of the power-up
+float powerUpHeight = 30;      // Height of the power-up
+float powerUpSpeed = 0.1f;     // Speed at which the power-up moves
 
+int playerScore = 0;           // Player's score
+
+float defaultTime = 60.0f;
+
+float remainingTime = defaultTime;  // Start with 60 seconds
+int lastTime = 0;  // To track the time between frames
+
+float timeElapsed = 0.0f;
 
 // Game state variables
 int playerLives = 70;
+
 bool isFlashing = false;
 int flashCounter = 0;
 bool showElbes = false;
@@ -73,6 +98,7 @@ float lowerBoundaryY = 40;
 // Game state
 bool gameStarted = false;
 bool gameOver = false;
+bool gameWon = false;
 
 // Main Function
 int main(int argc, char** argv)
@@ -119,6 +145,9 @@ int main(int argc, char** argv)
                 // Restart the game by resetting all variables
                 RestartGame();
             }
+            if (gameWon) {
+                RestartGame();
+            }
         }
         });
 
@@ -141,7 +170,7 @@ void Display(void)
     DrawBackground();
     DrawBoundaries();
 
-    if (gameStarted && !gameOver) {
+    if (gameStarted && !gameOver && !gameWon) {
         DrawPlayer();
         DrawObstacle();
 
@@ -154,6 +183,10 @@ void Display(void)
         // Draw clouds
         DrawCloud(300, upperBoundaryY - 30);
         DrawCloud(800, upperBoundaryY - 50);
+
+        DrawCollectible(collectibleX, collectibleY, collectibleWidth); // Call to the collectible drawing function
+        DrawPowerUp(powerUpX, powerUpY, powerUpWidth); // Call to the power-up drawing function
+
 
         // Handle collisions and game logic
         HandleCollisions();
@@ -168,6 +201,14 @@ void Display(void)
     else if (gameOver) {
         DrawGameOverScreen();
     }
+    else if (gameWon) {
+        DrawGameWonScreen();
+    }
+
+    updateTimer();
+    drawTimer();
+
+    glutSwapBuffers();
 
     glFlush(); // Flush the drawing to the screen
 }
@@ -257,7 +298,69 @@ void DrawPlayer(void)
     glEnd();
 }
 
+void drawTimer() {
 
+    if (!gameStarted || gameOver) {
+        return;
+    }
+
+    char timeStr[20];  // Buffer for storing formatted time
+    int minutes = (int)remainingTime / 60;  // Get minutes
+    int seconds = (int)remainingTime % 60;  // Get seconds
+
+    // Manually build the time string as "Time: MM:SS"
+    timeStr[0] = 'T';
+    timeStr[1] = 'i';
+    timeStr[2] = 'm';
+    timeStr[3] = 'e';
+    timeStr[4] = ' ';
+    timeStr[5] = ':';
+    timeStr[6] = ' ';
+    timeStr[7] = '0' + (minutes / 10);  // Tens place of minutes
+    timeStr[8] = '0' + (minutes % 10);  // Ones place of minutes
+    timeStr[9] = ':';
+    timeStr[10] = '0' + (seconds / 10);  // Tens place of seconds
+    timeStr[11] = '0' + (seconds % 10);  // Ones place of seconds
+    timeStr[12] = '\0';  // Null-terminator for the string
+
+    // Set the text color to an attractive color (e.g., light blue)
+    glColor3f(0.1f, 0.6f, 0.9f);
+
+    // Set the position for the timer at the top-right corner (adjust coordinates accordingly)
+    glRasterPos2f(windowWidth - 150, windowHeight - 30);
+
+    // Optionally, scale the text size if needed (adjust scale values)
+    glPushMatrix();  // Save the current matrix
+    glScalef(0.2f, 0.2f, 1.0f);  // Scale the text down (experiment with values to get the right size)
+
+    // Draw the timer text
+    for (const char* c = timeStr; *c != '\0'; c++) {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);  // Use a clean font for readability
+    }
+
+    glPopMatrix();  // Restore the original matrix
+}
+
+
+
+
+void updateTimer() {
+    if (!gameStarted || gameOver) {
+        return;
+    }
+    int currentTime = glutGet(GLUT_ELAPSED_TIME);  // Get elapsed time since the program started in milliseconds
+    int deltaTime = currentTime - lastTime;  // Calculate time passed since last update
+    timeElapsed += deltaTime;
+    if (deltaTime > 1000) {  // Update every second
+        remainingTime -= deltaTime / 1000.0f;  // Reduce remaining time
+        lastTime = currentTime;  // Update lastTime
+    }
+    if (remainingTime <= 0) {
+        remainingTime = 0;  // Ensure the timer doesn't go below 0
+        gameWon = true;
+    }
+
+}
 
 
 
@@ -283,12 +386,112 @@ void DrawObstacle(void)
     glEnd();
 }
 
+void DrawCollectible(float x, float y, float radius)
+{
+    int numSegments = 30; // Number of segments for the circle
+    float angleStep = 2.0f * M_PI / numSegments;
+
+    // Draw the outer edge of the coin (gold color)
+    glBegin(GL_TRIANGLE_FAN);
+    glColor3f(1.0f, 0.84f, 0.0f); // Gold color
+    glVertex2f(x, y); // Center of the coin
+
+    for (int i = 0; i <= numSegments; i++)
+    {
+        float angle = i * angleStep;
+        float dx = cos(angle) * radius;
+        float dy = sin(angle) * radius;
+        glVertex2f(x + dx, y + dy);
+    }
+    glEnd();
+
+    // Draw the inner circle (lighter color for the shine)
+    glBegin(GL_TRIANGLE_FAN);
+    glColor3f(1.0f, 0.9f, 0.0f); // Lighter gold color
+    float innerRadius = radius * 0.8f; // Inner radius smaller than outer radius
+    glVertex2f(x, y); // Center of the inner circle
+
+    for (int i = 0; i <= numSegments; i++)
+    {
+        float angle = i * angleStep;
+        float dx = cos(angle) * innerRadius;
+        float dy = sin(angle) * innerRadius;
+        glVertex2f(x + dx, y + dy);
+    }
+    glEnd();
+}
+
+void DrawPowerUp(float x, float y, float size)
+{
+    glBegin(GL_TRIANGLE_FAN);
+    glColor3f(1.0f, 1.0f, 0.0f); // Yellow color for the star
+    glVertex2f(x, y); // Center of the star
+
+    // Define the star points
+    for (int i = 0; i < 5; i++)
+    {
+        float angle = i * 2.0f * M_PI / 5.0f; // Outer points
+        glVertex2f(x + cos(angle) * size, y + sin(angle) * size);
+
+        angle += M_PI / 5.0f; // Inner points
+        glVertex2f(x + cos(angle) * (size * 0.5f), y + sin(angle) * (size * 0.5f));
+    }
+    glEnd();
+
+    // Draw a shiny effect on the star
+    glBegin(GL_TRIANGLE_FAN);
+    glColor3f(1.0f, 1.0f, 0.8f); // Lighter yellow for shine
+    glVertex2f(x, y); // Center of the star
+
+    // Define inner points for the shine
+    for (int i = 0; i < 5; i++)
+    {
+        float angle = i * 2.0f * M_PI / 5.0f; // Outer points
+        glVertex2f(x + cos(angle) * (size * 0.3f), y + sin(angle) * (size * 0.3f));
+
+        angle += M_PI / 5.0f; // Inner points
+        glVertex2f(x + cos(angle) * (size * 0.15f), y + sin(angle) * (size * 0.15f));
+    }
+    glEnd();
+}
+
+
+void handleSpeedupWithTime() {
+    // Calculate the elapsed time since the game started
+    int elapsedTime = defaultTime - remainingTime;
+
+    // Define speed increments
+    float speedIncrement = 0.004f; // Base speed increment
+    float maxSpeed = 0.4f; // Maximum speed cap
+
+    // Update the obstacle speed based on elapsed time
+    obstacleSpeed = 0.1f + (elapsedTime * speedIncrement);
+    obstacle2Speed = obstacleSpeed; // Keep both obstacle speeds synchronized
+    powerUpSpeed = obstacleSpeed;
+    collectibleSpeed = obstacleSpeed;
+
+    // Cap the speed to maximum allowed
+    if (obstacleSpeed > maxSpeed) {
+        obstacleSpeed = maxSpeed;
+        obstacle2Speed = maxSpeed;
+    }
+}
+
+
 
 // Collision Detection and Game Logic
 void HandleCollisions(void)
 {
-    obstacleX -= obstacleSpeed; // Move obstacle towards the player
-    obstacle2X -= obstacleSpeed;
+    handleSpeedupWithTime();
+
+    // Move obstacles towards the player
+    obstacleX -= obstacleSpeed;
+    obstacle2X -= obstacle2Speed;
+
+    // Move collectibles and power-ups towards the player
+    collectibleX -= collectibleSpeed;
+    powerUpX -= powerUpSpeed;
+
     // Reset obstacle position when it goes off-screen
     if (obstacleX + obstacleWidth < 0) {
         obstacleX = windowWidth;
@@ -298,7 +501,18 @@ void HandleCollisions(void)
         obstacle2X = windowWidth + 50;
     }
 
-    // Collision detection
+    // Reset collectible and power-up positions when they go off-screen
+    if (collectibleX + collectibleWidth < 0) {
+        collectibleX = windowWidth + rand() % 100 + 50; // Random position for new collectible
+        collectibleY = rand() % windowHeight - collectibleHeight; // Random vertical position
+    }
+
+    if (powerUpX + powerUpWidth < 0) {
+        powerUpX = windowWidth + rand() % 100 + 50; // Random position for new power-up
+        powerUpY = rand() % windowHeight - powerUpHeight; // Random vertical position
+    }
+
+    // Collision detection for obstacles
     if (playerX + playerWidth > obstacleX && playerX < obstacleX + obstacleWidth &&
         playerY < obstacleY + obstacleHeight && playerY + playerHeight > obstacleY) {
 
@@ -315,8 +529,8 @@ void HandleCollisions(void)
         }
     }
 
-    if (playerX + playerWidth > obstacle2X && playerX < obstacle2X + obstacleWidth &&
-        playerY < obstacle2Y + obstacleHeight && playerY + playerHeight > obstacle2Y) {
+    if (playerX + playerWidth > obstacle2X && playerX < obstacle2X + obstacle2Width &&
+        playerY < obstacle2Y + obstacle2Height && playerY + playerHeight > obstacle2Y) {
 
         if (!isFlashing) { // Only decrement lives if not already flashing
             playerLives--;
@@ -329,6 +543,23 @@ void HandleCollisions(void)
                 gameOver = true; // Set game over state
             }
         }
+    }
+
+    // Collision detection for collectibles
+    if (playerX + playerWidth > collectibleX && playerX < collectibleX + collectibleWidth &&
+        playerY < collectibleY + collectibleHeight && playerY + playerHeight > collectibleY) {
+
+        // Collect the item
+        playerScore += 100; // Increase score by 10
+        collectibleX = -50; // Move it off-screen until reset
+    }
+
+    // Collision detection for power-ups
+    if (playerX + playerWidth > powerUpX && playerX < powerUpX + powerUpWidth &&
+        playerY < powerUpY + powerUpHeight && playerY + playerHeight > powerUpY) {
+
+        // Collect the power-up
+        
     }
 
     if (isFlashing) {
@@ -345,6 +576,7 @@ void HandleCollisions(void)
         }
     }
 }
+
 
 // Jump and gravity logic
 void HandleJump()
@@ -467,6 +699,43 @@ void DrawGameOverScreen(void)
     DrawText("Click to Restart", 450, windowHeight / 2 - 20);
 }
 
+void DrawGameWonScreen(void) {
+    if (gameWon) {
+        DrawText("Congratulations, you survived! Game Won", 500, windowHeight / 2 + 20);
+        DrawText("Click to Restart", 450, windowHeight / 2 - 20);
+
+        // Display the player's score
+        char scoreText[50]; // Buffer to hold the score text
+        // Convert the score to a string manually
+        int score = playerScore; // Assuming playerScore is an integer
+        int i = 0;
+        if (score == 0) {
+            scoreText[i++] = '0'; // Handle score 0
+        }
+        else {
+            while (score > 0) {
+                scoreText[i++] = (score % 10) + '0'; // Get the last digit
+                score /= 10; // Remove the last digit
+            }
+        }
+        scoreText[i] = '\0'; // Null-terminate the string
+
+        // Reverse the score text to display it correctly
+        for (int j = 0; j < i / 2; j++) {
+            char temp = scoreText[j];
+            scoreText[j] = scoreText[i - j - 1];
+            scoreText[i - j - 1] = temp;
+        }
+
+        DrawText("Your Score: ", 450, windowHeight / 2 - 60);
+        DrawText(scoreText, 600, windowHeight / 2 - 60); // Adjust position as needed
+    }
+}
+
+
+
+
+
 // Draw Text Function
 void DrawText(const char* text, float x, float y)
 {
@@ -480,10 +749,13 @@ void DrawText(const char* text, float x, float y)
 // Start Game Function
 void StartGame() {
     playerLives = 70; // Reset lives
+    remainingTime = 60.0f; // Reset remaining time to 60 seconds
+    lastTime = glutGet(GLUT_ELAPSED_TIME); // Reset lastTime to current time
     playerY = 50; // Reset player position
     obstacleX = windowWidth; // Reset obstacle position
     gameStarted = true; // Set game started state
     gameOver = false; // Set game over state
+    gameWon = false;
 }
 
 // Restart Game Function
