@@ -1,7 +1,9 @@
 // Includes
 #include <stdlib.h>
 #include <cmath>
+#include <ctime>
 #include <glut.h>
+#include <stdio.h>
 
 // Define M_PI if it's not already defined
 #ifndef M_PI
@@ -30,8 +32,12 @@ void drawTimer(void);
 void handleSpeedupWithTime(void);
 void StartGame();
 void RestartGame();
-void DrawPowerUp(float x, float y, float size);
+void DrawPowerUp(float x, float y, float size, int type);
 void DrawCollectible(float x, float y, float radius);
+void DrawText2(float x, float y, const char* text);
+void DrawPowerUpTimer();
+void DrawCircleOutline(float cx, float cy, float r, int num_segments);
+void DrawCircle22(float cx, float cy, float r, int num_segments);
 
 // Global Variables
 int windowWidth = 1200;
@@ -45,7 +51,7 @@ float playerHeight = 50;
 float jumpSpeed = 0;
 bool isJumping = false;
 bool isDucking = false;
-float gravity = 0.00009;
+float gravity = 0.0001;
 
 
 // Obstacle position and size
@@ -74,6 +80,11 @@ float powerUpWidth = 30;       // Width of the power-up
 float powerUpHeight = 30;      // Height of the power-up
 float powerUpSpeed = 0.1f;     // Speed at which the power-up moves
 
+int powerUpType = 0;          // 1 for invincibility, 2 for score multiplier
+int powerUpDuration = 0;      // Timer for the power-up
+bool invincible = false;
+bool scoreMultiplier = false;
+
 int playerScore = 0;           // Player's score
 
 float defaultTime = 60.0f;
@@ -84,7 +95,7 @@ int lastTime = 0;  // To track the time between frames
 float timeElapsed = 0.0f;
 
 // Game state variables
-int playerLives = 70;
+int playerLives = 60;
 
 bool isFlashing = false;
 int flashCounter = 0;
@@ -100,9 +111,13 @@ bool gameStarted = false;
 bool gameOver = false;
 bool gameWon = false;
 
+
+
 // Main Function
 int main(int argc, char** argv)
 {
+
+    srand(static_cast<unsigned int>(time(0)));
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
     glutInitWindowSize(windowWidth, windowHeight);
@@ -185,7 +200,8 @@ void Display(void)
         DrawCloud(800, upperBoundaryY - 50);
 
         DrawCollectible(collectibleX, collectibleY, collectibleWidth); // Call to the collectible drawing function
-        DrawPowerUp(powerUpX, powerUpY, powerUpWidth); // Call to the power-up drawing function
+        DrawPowerUp(powerUpX, powerUpY, powerUpWidth / 2, powerUpType);
+        DrawPowerUpTimer();
 
 
         // Handle collisions and game logic
@@ -339,7 +355,67 @@ void drawTimer() {
     }
 
     glPopMatrix();  // Restore the original matrix
+
+    //------------------------------
+    // Display the player's score
+    char scoreText[50]; // Buffer to hold the score text
+    // Convert the score to a string manually
+    int score = playerScore; // Assuming playerScore is an integer
+    int i = 0;
+    if (score == 0) {
+        scoreText[i++] = '0'; // Handle score 0
+    }
+    else {
+        while (score > 0) {
+            scoreText[i++] = (score % 10) + '0'; // Get the last digit
+            score /= 10; // Remove the last digit
+        }
+    }
+    scoreText[i] = '\0'; // Null-terminate the string
+
+    // Reverse the score text to display it correctly
+    for (int j = 0; j < i / 2; j++) {
+        char temp = scoreText[j];
+        scoreText[j] = scoreText[i - j - 1];
+        scoreText[i - j - 1] = temp;
+    }
+
+    DrawText("Your Score: ", windowWidth - 350, windowHeight - 30);
+    DrawText(scoreText, windowWidth - 225, windowHeight - 30); // Adjust position as needed
+
+    //----------------------------------------------
+    // Draw the player's health bar
+    float maxHealth = 51.0f;  // The total health value
+    float currentHealth = (float)playerLives;  // Use playerLives to track the current health
+    float healthBarWidth = 200.0f;  // The total width of the health bar
+    float healthBarHeight = 20.0f;  // The height of the health bar
+    float filledHealthWidth = (currentHealth / maxHealth) * healthBarWidth;  // Width proportional to remaining health
+
+    // Set the health bar color (green for healthy)
+    glColor3f(0.0f, 0.8f, 0.0f);  // Green color for the filled health
+
+    // Draw the filled portion of the health bar
+    glBegin(GL_QUADS);
+    glVertex2f(windowWidth - 400, windowHeight - 60);  // Bottom-left corner
+    glVertex2f(windowWidth - 400 + filledHealthWidth, windowHeight - 60);  // Bottom-right corner
+    glVertex2f(windowWidth - 400 + filledHealthWidth, windowHeight - 60 + healthBarHeight);  // Top-right corner
+    glVertex2f(windowWidth - 400, windowHeight - 60 + healthBarHeight);  // Top-left corner
+    glEnd();
+
+    // Set the outline color for the health bar (black)
+    glColor3f(0.0f, 0.0f, 0.0f);
+
+    // Draw the outline of the health bar
+    glBegin(GL_LINE_LOOP);
+    glVertex2f(windowWidth - 400, windowHeight - 60);  // Bottom-left corner
+    glVertex2f(windowWidth - 400 + healthBarWidth, windowHeight - 60);  // Bottom-right corner
+    glVertex2f(windowWidth - 400 + healthBarWidth, windowHeight - 60 + healthBarHeight);  // Top-right corner
+    glVertex2f(windowWidth - 400, windowHeight - 60 + healthBarHeight);  // Top-left corner
+    glEnd();
+
+    //----------------------------------------------
 }
+
 
 
 
@@ -421,48 +497,64 @@ void DrawCollectible(float x, float y, float radius)
     glEnd();
 }
 
-void DrawPowerUp(float x, float y, float size)
+void DrawPowerUp(float x, float y, float size, int type)
 {
-    glBegin(GL_TRIANGLE_FAN);
-    glColor3f(1.0f, 1.0f, 0.0f); // Yellow color for the star
-    glVertex2f(x, y); // Center of the star
-
-    // Define the star points
-    for (int i = 0; i < 5; i++)
-    {
-        float angle = i * 2.0f * M_PI / 5.0f; // Outer points
-        glVertex2f(x + cos(angle) * size, y + sin(angle) * size);
-
-        angle += M_PI / 5.0f; // Inner points
-        glVertex2f(x + cos(angle) * (size * 0.5f), y + sin(angle) * (size * 0.5f));
+    if (type == 1) {
+        // Draw invincibility power-up as a star
+        glBegin(GL_TRIANGLE_FAN);
+        glColor3f(1.0f, 1.0f, 0.0f); // Yellow for invincibility
+        glVertex2f(x, y); // Center of the star
+        for (int i = 0; i < 5; i++)
+        {
+            float angle = i * 2.0f * M_PI / 5.0f; // Outer points
+            glVertex2f(x + cos(angle) * size, y + sin(angle) * size);
+            angle += M_PI / 5.0f; // Inner points
+            glVertex2f(x + cos(angle) * (size * 0.5f), y + sin(angle) * (size * 0.5f));
+        }
+        glEnd();
     }
-    glEnd();
-
-    // Draw a shiny effect on the star
-    glBegin(GL_TRIANGLE_FAN);
-    glColor3f(1.0f, 1.0f, 0.8f); // Lighter yellow for shine
-    glVertex2f(x, y); // Center of the star
-
-    // Define inner points for the shine
-    for (int i = 0; i < 5; i++)
-    {
-        float angle = i * 2.0f * M_PI / 5.0f; // Outer points
-        glVertex2f(x + cos(angle) * (size * 0.3f), y + sin(angle) * (size * 0.3f));
-
-        angle += M_PI / 5.0f; // Inner points
-        glVertex2f(x + cos(angle) * (size * 0.15f), y + sin(angle) * (size * 0.15f));
+    else if (type == 2) {
+        // Draw score multiplier power-up as a diamond
+        glBegin(GL_QUADS);
+        glColor3f(0.0f, 1.0f, 0.0f); // Green for score multiplier
+        glVertex2f(x, y + size); // Top point
+        glVertex2f(x - size, y); // Left point
+        glVertex2f(x, y - size); // Bottom point
+        glVertex2f(x + size, y); // Right point
+        glEnd();
     }
-    glEnd();
 }
 
+void DrawPowerUpTimer() {
+    if (invincible) {
+        char invincibilityTime[50];
+        sprintf(invincibilityTime, "Invincible: %d", powerUpDuration);
+        DrawText2(10, 10, invincibilityTime);
+    }
+    else if (scoreMultiplier) {
+        char multiplierTime[50];
+        sprintf(multiplierTime, "Multiplier: %d", powerUpDuration);
+        DrawText2(10, 10, multiplierTime);
+    }
+}
+
+void DrawText2(float x, float y, const char* text)
+{
+    glRasterPos2f(x, y);
+    while (*text)
+    {
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *text);
+        text++;
+    }
+}
 
 void handleSpeedupWithTime() {
     // Calculate the elapsed time since the game started
     int elapsedTime = defaultTime - remainingTime;
 
     // Define speed increments
-    float speedIncrement = 0.004f; // Base speed increment
-    float maxSpeed = 0.4f; // Maximum speed cap
+    float speedIncrement = 0.0045f; // Base speed increment
+    float maxSpeed = 0.7f; // Maximum speed cap
 
     // Update the obstacle speed based on elapsed time
     obstacleSpeed = 0.1f + (elapsedTime * speedIncrement);
@@ -484,63 +576,64 @@ void HandleCollisions(void)
 {
     handleSpeedupWithTime();
 
-    // Move obstacles towards the player
+    // Move obstacles and power-ups
     obstacleX -= obstacleSpeed;
     obstacle2X -= obstacle2Speed;
-
-    // Move collectibles and power-ups towards the player
     collectibleX -= collectibleSpeed;
     powerUpX -= powerUpSpeed;
 
-    // Reset obstacle position when it goes off-screen
+    // Reset obstacle positions when off-screen
     if (obstacleX + obstacleWidth < 0) {
         obstacleX = windowWidth;
     }
-
     if (obstacle2X + obstacleWidth < 0) {
         obstacle2X = windowWidth + 50;
     }
 
-    // Reset collectible and power-up positions when they go off-screen
+    // Reset collectible and power-up positions when off-screen
     if (collectibleX + collectibleWidth < 0) {
-        collectibleX = windowWidth + rand() % 100 + 50; // Random position for new collectible
-        collectibleY = rand() % windowHeight - collectibleHeight; // Random vertical position
+        collectibleX = windowWidth + rand() % 100 + 50;
+        collectibleY = 200;
     }
-
     if (powerUpX + powerUpWidth < 0) {
-        powerUpX = windowWidth + rand() % 100 + 50; // Random position for new power-up
-        powerUpY = rand() % windowHeight - powerUpHeight; // Random vertical position
+        powerUpX = windowWidth + rand() % 100 + 50;
+        powerUpY = 200;
+        powerUpType = rand() % 2 + 1; // Randomize power-up type: 1 for invincibility, 2 for score multiplier
     }
 
-    // Collision detection for obstacles
-    if (playerX + playerWidth > obstacleX && playerX < obstacleX + obstacleWidth &&
-        playerY < obstacleY + obstacleHeight && playerY + playerHeight > obstacleY) {
+    // Collision detection for obstacles (only if not invincible)
+    if (!invincible) {
+        if (playerX + playerWidth > obstacleX && playerX < obstacleX + obstacleWidth &&
+            playerY < obstacleY + obstacleHeight && playerY + playerHeight > obstacleY) {
 
-        if (!isFlashing) { // Only decrement lives if not already flashing
-            playerLives--;
-            isFlashing = true;
-            flashCounter = 0;
-            showElbes = true;
-            elbesCounter = 0;
+            if (!isFlashing) {
+                playerLives--;
+                printf("Player lives after collision: %d\n", playerLives);
+                isFlashing = true;
+                flashCounter = 0;
+                showElbes = true;
+                elbesCounter = 0;
 
-            if (playerLives == 0) {
-                gameOver = true; // Set game over state
+                if (playerLives == 0) {
+                    gameOver = true;
+                }
             }
         }
-    }
 
-    if (playerX + playerWidth > obstacle2X && playerX < obstacle2X + obstacle2Width &&
-        playerY < obstacle2Y + obstacle2Height && playerY + playerHeight > obstacle2Y) {
+        if (playerX + playerWidth > obstacle2X && playerX < obstacle2X + obstacle2Width &&
+            playerY < obstacle2Y + obstacle2Height && playerY + playerHeight > obstacle2Y) {
 
-        if (!isFlashing) { // Only decrement lives if not already flashing
-            playerLives--;
-            isFlashing = true;
-            flashCounter = 0;
-            showElbes = true;
-            elbesCounter = 0;
+            if (!isFlashing) {
+                playerLives--;
+                printf("Player lives after collision: %d\n", playerLives);
+                isFlashing = true;
+                flashCounter = 0;
+                showElbes = true;
+                elbesCounter = 0;
 
-            if (playerLives == 0) {
-                gameOver = true; // Set game over state
+                if (playerLives == 0) {
+                    gameOver = true;
+                }
             }
         }
     }
@@ -549,30 +642,47 @@ void HandleCollisions(void)
     if (playerX + playerWidth > collectibleX && playerX < collectibleX + collectibleWidth &&
         playerY < collectibleY + collectibleHeight && playerY + playerHeight > collectibleY) {
 
-        // Collect the item
-        playerScore += 100; // Increase score by 10
-        collectibleX = -50; // Move it off-screen until reset
+        playerScore += scoreMultiplier ? 200 : 100; // Double score if scoreMultiplier is active
+        collectibleX = -50; // Move off-screen until reset
     }
 
     // Collision detection for power-ups
     if (playerX + playerWidth > powerUpX && playerX < powerUpX + powerUpWidth &&
         playerY < powerUpY + powerUpHeight && playerY + playerHeight > powerUpY) {
 
-        // Collect the power-up
-        
+        if (powerUpType == 1) {
+            invincible = true;
+        }
+        else if (powerUpType == 2) {
+            scoreMultiplier = true;
+        }
+
+        powerUpDuration = 5000; // Lasts for 5 seconds
+        powerUpX = -50; // Move off-screen until reset
     }
 
+    // Handle flashing effect after collision
     if (isFlashing) {
         flashCounter++;
-        if (flashCounter > 40) { // Stop flashing after a short time
+        if (flashCounter > 40) {
             isFlashing = false;
         }
     }
 
+    // Handle "elbes" display after collision
     if (showElbes) {
         elbesCounter++;
-        if (elbesCounter > 1000) { // Show "elbes" 
+        if (elbesCounter > 1000) {
             showElbes = false;
+        }
+    }
+
+    // Manage power-up durations
+    if (invincible || scoreMultiplier) {
+        powerUpDuration--;
+        if (powerUpDuration <= 0) {
+            invincible = false;
+            scoreMultiplier = false;
         }
     }
 }
@@ -612,24 +722,74 @@ void HandleJump()
 // Draw Boundaries Function
 void DrawBoundaries(void)
 {
-    // Draw upper boundary (solid rectangle)
-    glColor3f(0.5f, 0.45f, 0.05f); // Brown color
+    // Upper boundary (gradient rectangle)
     glBegin(GL_QUADS);
+    glColor3f(0.8f, 0.7f, 0.3f); // Light brown top
     glVertex2f(0, upperBoundaryY);
     glVertex2f(windowWidth, upperBoundaryY);
+    glColor3f(0.5f, 0.4f, 0.1f); // Darker brown bottom
     glVertex2f(windowWidth, windowHeight);
     glVertex2f(0, windowHeight);
     glEnd();
 
-    // Draw lower boundary (solid rectangle)
+    // Lower boundary (gradient ground)
     glBegin(GL_QUADS);
-    glColor3f(0.5f, 0.25f, 0.0f); // Dark brown color
-    glVertex2f(0, 0);
-    glVertex2f(windowWidth, 0);
-    glVertex2f(windowWidth, lowerBoundaryY);
+    glColor3f(0.3f, 0.15f, 0.05f); // Lighter brown top
     glVertex2f(0, lowerBoundaryY);
+    glVertex2f(windowWidth, lowerBoundaryY);
+    glColor3f(0.2f, 0.1f, 0.05f); // Darker brown bottom
+    glVertex2f(windowWidth, 0);
+    glVertex2f(0, 0);
+    glEnd();
+
+    // Add a smooth transition line at the top of the lower boundary
+    glLineWidth(4.0f);
+    glColor3f(0.4f, 0.2f, 0.1f); // Mid-tone brown for outline
+    glBegin(GL_LINES);
+    glVertex2f(0, lowerBoundaryY);
+    glVertex2f(windowWidth, lowerBoundaryY);
+    glEnd();
+
+    // Add small decorative triangles (grass-like) along the lower boundary
+    for (float i = 0; i < windowWidth; i += 50.0f)
+    {
+        glColor3f(0.2f, 0.7f, 0.3f); // Green grass color
+        glBegin(GL_TRIANGLES);
+        glVertex2f(i, lowerBoundaryY);
+        glVertex2f(i + 10, lowerBoundaryY + 20); // Point of the triangle
+        glVertex2f(i + 20, lowerBoundaryY);
+        glEnd();
+    }
+
+    // Add a series of arcs to the upper boundary (cloud-like shapes)
+    for (float i = 50; i < windowWidth; i += 100.0f)
+    {
+        glColor3f(0.9f, 0.9f, 0.9f); // Light gray for the arcs
+        DrawCircle22(i, upperBoundaryY + 20, 15, 50); // Cloud arc
+    }
+
+    // Thin line for extra detailing on the upper boundary
+    glLineWidth(2.0f);
+    glColor3f(0.6f, 0.5f, 0.2f); // Mid-tone brown
+    glBegin(GL_LINES);
+    glVertex2f(0, upperBoundaryY);
+    glVertex2f(windowWidth, upperBoundaryY);
     glEnd();
 }
+
+// Helper function to draw a circle
+void DrawCircle22(float cx, float cy, float r, int num_segments)
+{
+    glBegin(GL_TRIANGLE_FAN);
+    for (int i = 0; i <= num_segments; i++) {
+        float theta = 2.0f * M_PI * float(i) / float(num_segments); // Angle
+        float dx = r * cosf(theta); // X component
+        float dy = r * sinf(theta); // Y component
+        glVertex2f(cx + dx, cy + dy);
+    }
+    glEnd();
+}
+
 
 // Draw Background Function
 void DrawBackground(void)
@@ -662,19 +822,56 @@ void DrawCircle(float x, float y, float radius, int segments)
 // Draw Tree Function
 void DrawTree(float x, float y)
 {
-    // Draw trunk
-    glColor3f(0.545f, 0.271f, 0.075f); // Brown color
+    // Enable blending for transparency
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // Draw trunk with a gradient for better appearance
     glBegin(GL_QUADS);
+    glColor3f(0.4f, 0.2f, 0.05f); // Darker brown at the bottom
+    glVertex2f(x, y);
+    glVertex2f(x + 10, y);
+    glColor3f(0.6f, 0.3f, 0.1f); // Lighter brown at the top
+    glVertex2f(x + 10, y + 30);
+    glVertex2f(x, y + 30);
+    glEnd();
+
+    // Outline for the trunk
+    glColor3f(0.0f, 0.0f, 0.0f); // Black outline
+    glLineWidth(2.0f);
+    glBegin(GL_LINE_LOOP);
     glVertex2f(x, y);
     glVertex2f(x + 10, y);
     glVertex2f(x + 10, y + 30);
     glVertex2f(x, y + 30);
     glEnd();
 
-    // Draw leaves
-    glColor3f(0.0f, 0.5f, 0.0f); // Green color
-    DrawCircle(x + 5, y + 40, 20, 20);
+    // Draw transparent leaves
+    glColor4f(0.0f, 0.8f, 0.0f, 0.6f); // Green with transparency
+    DrawCircle(x + 5, y + 40, 20, 20); // Main leafy part
+
+    // Draw the outline for the leaves
+    glColor3f(0.0f, 0.3f, 0.0f); // Darker green for the outline
+    glLineWidth(2.0f);
+    DrawCircleOutline(x + 5, y + 40, 20, 20);
+
+    // Disable blending after we're done
+    glDisable(GL_BLEND);
 }
+
+// Helper function to draw an outlined circle
+void DrawCircleOutline(float cx, float cy, float r, int num_segments)
+{
+    glBegin(GL_LINE_LOOP);
+    for (int i = 0; i < num_segments; i++) {
+        float theta = 2.0f * M_PI * float(i) / float(num_segments);
+        float dx = r * cosf(theta); // Calculate the x component
+        float dy = r * sinf(theta); // Calculate the y component
+        glVertex2f(cx + dx, cy + dy);
+    }
+    glEnd();
+}
+
 
 // Draw Cloud Function
 void DrawCloud(float x, float y)
@@ -748,14 +945,18 @@ void DrawText(const char* text, float x, float y)
 
 // Start Game Function
 void StartGame() {
-    playerLives = 70; // Reset lives
+    playerLives = 51; // Reset lives
+    playerScore = 0;
     remainingTime = 60.0f; // Reset remaining time to 60 seconds
     lastTime = glutGet(GLUT_ELAPSED_TIME); // Reset lastTime to current time
     playerY = 50; // Reset player position
     obstacleX = windowWidth; // Reset obstacle position
+    obstacle2X = windowWidth+400;
     gameStarted = true; // Set game started state
     gameOver = false; // Set game over state
     gameWon = false;
+    invincible = false;
+    scoreMultiplier = false;
 }
 
 // Restart Game Function
