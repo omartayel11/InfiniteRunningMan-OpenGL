@@ -39,6 +39,7 @@ void DrawPowerUpTimer();
 void DrawCircleOutline(float cx, float cy, float r, int num_segments);
 void DrawCircle22(float cx, float cy, float r, int num_segments);
 
+
 // Global Variables
 int windowWidth = 1200;
 int windowHeight = 400;
@@ -53,6 +54,7 @@ bool isJumping = false;
 bool isDucking = false;
 float gravity = 0.0001;
 
+float powerUpAngle = 0.0f; // Global variable for rotation angle
 
 // Obstacle position and size
 float obstacleX = windowWidth;
@@ -114,6 +116,12 @@ bool gameWon = false;
 bool playerCollided = false;
 float collisionTimer = 0.0f;
 
+float lightningTimer = 0.0f; // Timer for lightning effect
+const float lightningInterval = 3.0f; // Time in seconds between lightning strikes
+bool lightningActive = false; // Whether lightning is currently active
+
+
+
 // Main Function
 int main(int argc, char** argv)
 {
@@ -129,24 +137,24 @@ int main(int argc, char** argv)
     glutDisplayFunc(Display);
     glutIdleFunc(Anim);
     glutKeyboardFunc([](unsigned char key, int x, int y) {
-    if (key == ' ' && !isJumping && gameStarted && !gameOver) {
-        isJumping = true;
-        jumpSpeed = 32; // Initial jump speed
-    }
-    if (key == 'd' && !gameOver) {
-        // Check if the player can duck without going below the lower boundary
-        if (playerY - playerHeight / 2 >= lowerBoundaryY-30) {
-            isDucking = true;
-            playerY -= playerHeight / 2; // Move player down to duck
+        if (key == ' ' && !isJumping && gameStarted && !gameOver) {
+            isJumping = true;
+            jumpSpeed = 32; // Initial jump speed
         }
-    }
-});
+        if (key == 'd' && !gameOver) {
+            // Check if the player can duck without going below the lower boundary
+            if (playerY - playerHeight / 2 >= lowerBoundaryY - 30) {
+                isDucking = true;
+                playerY -= playerHeight / 2; // Move player down to duck
+            }
+        }
+        });
 
     glutKeyboardUpFunc([](unsigned char key, int x, int y) {
         if (key == 'd') {
             isDucking = false;
             playerY += playerHeight / 2; // Move player up to stand
-            
+
         }
         });
 
@@ -500,17 +508,24 @@ void DrawCollectible(float x, float y, float radius)
 
 void DrawPowerUp(float x, float y, float size, int type)
 {
+    glPushMatrix(); // Save the current state of the modelview matrix
+    glTranslatef(x, y, 0); // Move to the power-up's position
+    glRotatef(powerUpAngle, 0.0f, 0.0f, 1.0f); // Rotate around the Z-axis
+
     if (type == 1) {
         // Draw invincibility power-up as a star
         glBegin(GL_TRIANGLE_FAN);
         glColor3f(1.0f, 1.0f, 0.0f); // Yellow for invincibility
-        glVertex2f(x, y); // Center of the star
+        glVertex2f(0.0f, 0.0f); // Center of the star
         for (int i = 0; i < 5; i++)
         {
-            float angle = i * 2.0f * M_PI / 5.0f; // Outer points
-            glVertex2f(x + cos(angle) * size, y + sin(angle) * size);
-            angle += M_PI / 5.0f; // Inner points
-            glVertex2f(x + cos(angle) * (size * 0.5f), y + sin(angle) * (size * 0.5f));
+            float outerAngle = i * 2.0f * M_PI / 5.0f; // Outer points
+            float innerAngle = outerAngle + M_PI / 5.0f; // Inner points
+
+            // Outer point
+            glVertex2f(cos(outerAngle) * size, sin(outerAngle) * size);
+            // Inner point
+            glVertex2f(cos(innerAngle) * (size * 0.5f), sin(innerAngle) * (size * 0.5f));
         }
         glEnd();
     }
@@ -518,13 +533,16 @@ void DrawPowerUp(float x, float y, float size, int type)
         // Draw score multiplier power-up as a diamond
         glBegin(GL_QUADS);
         glColor3f(0.0f, 1.0f, 0.0f); // Green for score multiplier
-        glVertex2f(x, y + size); // Top point
-        glVertex2f(x - size, y); // Left point
-        glVertex2f(x, y - size); // Bottom point
-        glVertex2f(x + size, y); // Right point
+        glVertex2f(0.0f, size); // Top point
+        glVertex2f(-size, 0.0f); // Left point
+        glVertex2f(0.0f, -size); // Bottom point
+        glVertex2f(size, 0.0f); // Right point
         glEnd();
     }
+
+    glPopMatrix(); // Restore the previous state of the modelview matrix
 }
+
 
 void DrawPowerUpTimer() {
     if (invincible) {
@@ -576,7 +594,7 @@ void handleSpeedupWithTime() {
 void HandleCollisions(void)
 {
     handleSpeedupWithTime();
-    if(playerCollided)
+    if (playerCollided)
         collisionTimer += 0.1;
 
     if (collisionTimer >= 50) {
@@ -591,7 +609,7 @@ void HandleCollisions(void)
         powerUpX -= powerUpSpeed;
     }
 
-    if(playerCollided) {
+    if (playerCollided) {
         obstacleX += obstacleSpeed;
         obstacle2X += obstacle2Speed;
         collectibleX += collectibleSpeed;
@@ -603,7 +621,8 @@ void HandleCollisions(void)
         obstacleX = windowWidth;
     }
     if (obstacle2X + obstacleWidth < 0) {
-        obstacle2X = windowWidth + 50;
+        
+        obstacle2X = windowWidth + (windowWidth/2);
     }
 
     // Reset collectible and power-up positions when off-screen
@@ -812,8 +831,26 @@ void DrawCircle22(float cx, float cy, float r, int num_segments)
 
 
 // Draw Background Function
+
 void DrawBackground(void)
 {
+    // Define global variables for raindrops
+    const int numRaindrops = 100; // Number of raindrops
+    static float rainX[numRaindrops]; // X positions of raindrops
+    static float rainY[numRaindrops]; // Y positions of raindrops
+    float rainLength = 10.0f; // Length of each raindrop
+    float rainSpeed = 0.1f; // Speed of falling rain
+
+    // Initialize raindrop positions randomly (only on the first call)
+    static bool initialized = false; // Flag to check if initialized
+    if (!initialized) {
+        for (int i = 0; i < numRaindrops; i++) {
+            rainX[i] = rand() % windowWidth; // Random X position
+            rainY[i] = rand() % windowHeight; // Random starting Y position
+        }
+        initialized = true; // Set the flag to true after initialization
+    }
+
     // Draw a gradient background
     for (int i = 0; i < windowHeight; i++) {
         float colorValue = (float)i / windowHeight; // Calculate gradient color
@@ -823,7 +860,30 @@ void DrawBackground(void)
         glVertex2f(windowWidth, i);
         glEnd();
     }
+
+    // Draw rain effect
+    glColor3f(1.0f, 1.0f, 1.0f); // White color for rain
+
+    // Update positions of raindrops
+    for (int i = 0; i < numRaindrops; i++) {
+        rainY[i] -= rainSpeed; // Move raindrop down
+
+        // Reset raindrop position when it goes off screen
+        if (rainY[i] < 0) {
+            rainY[i] = windowHeight; // Reset to the top
+            rainX[i] = rand() % windowWidth; // Random new X position
+        }
+
+        // Draw each raindrop as a line
+        glBegin(GL_LINES);
+        glVertex2f(rainX[i], rainY[i]); // Start point of the raindrop
+        glVertex2f(rainX[i], rainY[i] - rainLength); // End point of the raindrop
+        glEnd();
+    }
 }
+
+
+
 
 // Draw Circle Function
 void DrawCircle(float x, float y, float radius, int segments)
@@ -896,10 +956,21 @@ void DrawCircleOutline(float cx, float cy, float r, int num_segments)
 // Draw Cloud Function
 void DrawCloud(float x, float y)
 {
+    // Set the color for the cloud
     glColor3f(1.0f, 1.0f, 1.0f); // White color
+
+    // Draw the base cloud shape
     DrawCircle(x, y, 15, 10);
     DrawCircle(x + 20, y, 15, 10);
     DrawCircle(x + 10, y + 15, 15, 10);
+
+    // Draw lightning effect if active
+    if (lightningActive) {
+        glColor3f(1.0f, 1.0f, 0.8f); // Brighten the clouds to simulate lightning
+        DrawCircle(x, y, 15, 10);
+        DrawCircle(x + 20, y, 15, 10);
+        DrawCircle(x + 10, y + 15, 15, 10);
+    }
 }
 
 // Draw Start Screen
@@ -950,7 +1021,28 @@ void DrawGameWonScreen(void) {
 }
 
 
+void DrawLightning(float startX, float startY, float endX, float endY)
+{
+    glColor3f(1.0f, 1.0f, 0.8f); // Bright color for lightning
 
+    glBegin(GL_LINE_STRIP);
+    glVertex2f(startX, startY); // Start point of the lightning
+
+    // Create a zigzag effect for the lightning bolt
+    for (int i = 1; i <= 4; i++) {
+        float offsetX = (rand() % 20 - 10) / 10.0f; // Random horizontal offset
+        float offsetY = i % 2 == 0 ? -15.0f : 15.0f; // Alternating vertical offset
+
+        // Calculate intermediate points
+        float x = startX + (endX - startX) * (i / 4.0f) + offsetX;
+        float y = startY + (endY - startY) * (i / 4.0f) + offsetY;
+
+        glVertex2f(x, y); // Intermediate point of the lightning
+    }
+
+    glVertex2f(endX, endY); // End point of the lightning
+    glEnd();
+}
 
 
 // Draw Text Function
@@ -971,12 +1063,13 @@ void StartGame() {
     lastTime = glutGet(GLUT_ELAPSED_TIME); // Reset lastTime to current time
     playerY = 50; // Reset player position
     obstacleX = windowWidth; // Reset obstacle position
-    obstacle2X = windowWidth+400;
+    obstacle2X = windowWidth + 400;
     gameStarted = true; // Set game started state
     gameOver = false; // Set game over state
     gameWon = false;
     invincible = false;
     scoreMultiplier = false;
+    playerCollided = false;
 }
 
 // Restart Game Function
@@ -989,7 +1082,18 @@ void Anim(void)
 {
     HandleJump(); // Handle jumping logic
 
+    powerUpAngle += 0.2f; // Increase angle for spinning (adjust speed as needed)
+    if (powerUpAngle >= 360.0f) {
+        powerUpAngle -= 360.0f; // Keep angle within 0 to 360 degrees
+    }
+
+    // Update lightning effect
+    lightningTimer += 0.016f; // Increment timer (assuming ~60 FPS)
+    if (lightningTimer >= lightningInterval) {
+        lightningActive = rand() % 2; // Randomly activate or deactivate lightning
+        lightningTimer = 0.0f; // Reset timer
+    }
+
     // Redisplay the scene
     glutPostRedisplay(); // Mark the current window as needing to be redrawn
-
 }
