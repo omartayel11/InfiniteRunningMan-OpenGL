@@ -23,4 +23,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <Media Include="..\..\game-start-6104.wav">
+      <Filter>Source Files</Filter>
+    </Media>
+    <Media Include="..\..\Super Mario Bros. Theme Song.wav">
+      <Filter>Source Files</Filter>
+    </Media>
+  </ItemGroup>
 </Project>

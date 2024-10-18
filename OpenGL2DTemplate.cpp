@@ -4,6 +4,7 @@
 #include <ctime>
 #include <glut.h>
 #include <stdio.h>
+#include <windows.h>
 
 // Define M_PI if it's not already defined
 #ifndef M_PI
@@ -38,7 +39,8 @@ void DrawText2(float x, float y, const char* text);
 void DrawPowerUpTimer();
 void DrawCircleOutline(float cx, float cy, float r, int num_segments);
 void DrawCircle22(float cx, float cy, float r, int num_segments);
-
+void PlaySoundEffect(const char* filename);
+void SetVolume(WORD volume);
 
 // Global Variables
 int windowWidth = 1200;
@@ -136,6 +138,8 @@ int main(int argc, char** argv)
 
     glutDisplayFunc(Display);
     glutIdleFunc(Anim);
+    SetVolume(0x3000);
+    PlaySoundEffect("../../Super Mario Bros. Theme Song.wav");
     glutKeyboardFunc([](unsigned char key, int x, int y) {
         if (key == ' ' && !isJumping && gameStarted && !gameOver) {
             isJumping = true;
@@ -237,6 +241,16 @@ void Display(void)
 
     glFlush(); // Flush the drawing to the screen
 }
+
+void PlaySoundEffect(const char* filename) {
+    PlaySoundA(filename, NULL, SND_FILENAME | SND_ASYNC);
+}
+
+void SetVolume(WORD volume) {
+    // Set the volume for both left and right channels
+    waveOutSetVolume(0, volume | (volume << 16));
+}
+
 
 // Draw Player Function
 void DrawPlayer(void)
@@ -642,7 +656,7 @@ void HandleCollisions(void)
             playerY < obstacleY + obstacleHeight && playerY + playerHeight > obstacleY) {
 
             playerCollided = true;
-
+            //PlaySoundEffect("../../game-start-6104.wav");
             if (!isFlashing) {
                 playerLives--;
                 printf("Player lives after collision: %d\n", playerLives);
@@ -661,7 +675,7 @@ void HandleCollisions(void)
             playerY < obstacle2Y + obstacle2Height && playerY + playerHeight > obstacle2Y) {
 
             playerCollided = true;
-
+            //PlaySoundEffect("../../game-start-6104.wav");
             if (!isFlashing) {
                 playerLives--;
                 printf("Player lives after collision: %d\n", playerLives);
