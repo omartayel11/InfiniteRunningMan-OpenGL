@@ -111,7 +111,8 @@ bool gameStarted = false;
 bool gameOver = false;
 bool gameWon = false;
 
-
+bool playerCollided = false;
+float collisionTimer = 0.0f;
 
 // Main Function
 int main(int argc, char** argv)
@@ -575,12 +576,27 @@ void handleSpeedupWithTime() {
 void HandleCollisions(void)
 {
     handleSpeedupWithTime();
+    if(playerCollided)
+        collisionTimer += 0.1;
 
+    if (collisionTimer >= 50) {
+        playerCollided = false;
+        collisionTimer = 0;
+    }
     // Move obstacles and power-ups
-    obstacleX -= obstacleSpeed;
-    obstacle2X -= obstacle2Speed;
-    collectibleX -= collectibleSpeed;
-    powerUpX -= powerUpSpeed;
+    if (!playerCollided) {
+        obstacleX -= obstacleSpeed;
+        obstacle2X -= obstacle2Speed;
+        collectibleX -= collectibleSpeed;
+        powerUpX -= powerUpSpeed;
+    }
+
+    if(playerCollided) {
+        obstacleX += obstacleSpeed;
+        obstacle2X += obstacle2Speed;
+        collectibleX += collectibleSpeed;
+        powerUpX += powerUpSpeed;
+    }
 
     // Reset obstacle positions when off-screen
     if (obstacleX + obstacleWidth < 0) {
@@ -606,6 +622,8 @@ void HandleCollisions(void)
         if (playerX + playerWidth > obstacleX && playerX < obstacleX + obstacleWidth &&
             playerY < obstacleY + obstacleHeight && playerY + playerHeight > obstacleY) {
 
+            playerCollided = true;
+
             if (!isFlashing) {
                 playerLives--;
                 printf("Player lives after collision: %d\n", playerLives);
@@ -622,6 +640,8 @@ void HandleCollisions(void)
 
         if (playerX + playerWidth > obstacle2X && playerX < obstacle2X + obstacle2Width &&
             playerY < obstacle2Y + obstacle2Height && playerY + playerHeight > obstacle2Y) {
+
+            playerCollided = true;
 
             if (!isFlashing) {
                 playerLives--;
