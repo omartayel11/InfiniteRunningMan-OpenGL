@@ -40,6 +40,9 @@ void DrawPowerUpTimer();
 void DrawCircleOutline(float cx, float cy, float r, int num_segments);
 void DrawCircle22(float cx, float cy, float r, int num_segments);
 void PlaySoundEffect(const char* filename);
+void PlaySoundEffect2(const char* filename);
+void PlaySoundEffect3(const char* filename);
+void PlaySoundEffect4(const char* filename);
 void SetVolume(WORD volume);
 
 // Global Variables
@@ -54,22 +57,23 @@ float playerHeight = 50;
 float jumpSpeed = 0;
 bool isJumping = false;
 bool isDucking = false;
-float gravity = 0.0001;
+float gravity = 0.00015;
 
 float powerUpAngle = 0.0f; // Global variable for rotation angle
+float collectibleAngle = 0.0f;
 
 // Obstacle position and size
 float obstacleX = windowWidth;
 float obstacleY = 50;
 float obstacleWidth = 30;
-float obstacleHeight = 40;
+float obstacleHeight = 10 + rand()%40;
 float obstacleSpeed = 0.1f;
 
 // Second Obstacle position and size
 float obstacle2X = windowWidth + 300;  // Starts off-screen to the right
-float obstacle2Y = 90;           // Set this to be above the first obstacle
+float obstacle2Y = 90 + rand()%5;           // Set this to be above the first obstacle
 float obstacle2Width = 30;
-float obstacle2Height = 110;
+float obstacle2Height = 90 + rand()%20;
 float obstacle2Speed = 0.1f;      // Same speed for consistency
 
 float collectibleX = 300;      // X position of the collectible
@@ -78,7 +82,7 @@ float collectibleWidth = 20;   // Width of the collectible
 float collectibleHeight = 20;  // Height of the collectible
 float collectibleSpeed = 0.1f; // Speed at which the collectible moves
 
-float powerUpX = 500;          // X position of the power-up
+float powerUpX = 1000;          // X position of the power-up
 float powerUpY = 200;          // Y position of the power-up
 float powerUpWidth = 30;       // Width of the power-up
 float powerUpHeight = 30;      // Height of the power-up
@@ -99,7 +103,7 @@ int lastTime = 0;  // To track the time between frames
 float timeElapsed = 0.0f;
 
 // Game state variables
-int playerLives = 60;
+int playerLives = 5;
 
 bool isFlashing = false;
 int flashCounter = 0;
@@ -117,6 +121,8 @@ bool gameWon = false;
 
 bool playerCollided = false;
 float collisionTimer = 0.0f;
+
+
 
 float lightningTimer = 0.0f; // Timer for lightning effect
 const float lightningInterval = 3.0f; // Time in seconds between lightning strikes
@@ -139,7 +145,7 @@ int main(int argc, char** argv)
     glutDisplayFunc(Display);
     glutIdleFunc(Anim);
     SetVolume(0x3000);
-    PlaySoundEffect("../../Super Mario Bros. Theme Song.wav");
+    
     glutKeyboardFunc([](unsigned char key, int x, int y) {
         if (key == ' ' && !isJumping && gameStarted && !gameOver) {
             isJumping = true;
@@ -226,12 +232,15 @@ void Display(void)
     }
     else if (!gameStarted) {
         DrawStartScreen();
+        PlaySoundEffect("../../Wii Music - Gaming Background Music (HD).wav");
     }
     else if (gameOver) {
         DrawGameOverScreen();
+        PlaySoundEffect("../../Game Over sound effect.wav");
     }
     else if (gameWon) {
         DrawGameWonScreen();
+        PlaySoundEffect("../../WIN sound effect no copyright.wav");
     }
 
     updateTimer();
@@ -243,9 +252,19 @@ void Display(void)
 }
 
 void PlaySoundEffect(const char* filename) {
+    PlaySoundA(filename, NULL, SND_FILENAME | SND_ASYNC | SND_LOOP | SND_NOSTOP);
+}
+void PlaySoundEffect2(const char* filename) {
+    //PlaySoundA(filename, NULL, SND_FILENAME | SND_ASYNC);
+    sndPlaySoundA(filename, SND_FILENAME | SND_ASYNC);
+
+}
+void PlaySoundEffect3(const char* filename) {
     PlaySoundA(filename, NULL, SND_FILENAME | SND_ASYNC);
 }
-
+void PlaySoundEffect4(const char* filename) {
+    PlaySoundA(filename, NULL, SND_FILENAME | SND_ASYNC);
+}
 void SetVolume(WORD volume) {
     // Set the volume for both left and right channels
     waveOutSetVolume(0, volume | (volume << 16));
@@ -271,6 +290,35 @@ void DrawPlayer(void)
     glVertex2f(playerX, playerY + adjustedHeight);
     glEnd();
 
+    // Draw polygon (pentagon) on the body
+    glColor3f(1.0f, 0.0f, 0.0f); // Green color for the polygon
+    glBegin(GL_POLYGON);
+    float radius = 10.0f; // Radius of the pentagon
+    for (int i = 0; i < 5; i++) {
+        float angle = 2.0f * M_PI * float(i) / 5.0f; // Calculate angle
+        float x = playerX + playerWidth / 2 + radius * cos(angle); // X position
+        float y = playerY + adjustedHeight / 2 + radius * sin(angle); // Y position
+        glVertex2f(x, y);
+    }
+    glEnd();
+
+    // Add lines to the body for a detailed look
+    glColor3f(1.0f, 1.0f, 1.0f); // White color for lines
+    glBegin(GL_LINES);
+    // Vertical center line
+    glVertex2f(playerX + playerWidth / 2, playerY);
+    glVertex2f(playerX + playerWidth / 2, playerY + adjustedHeight);
+
+    glVertex2f(playerX + playerWidth / 4, playerY);
+    glVertex2f(playerX + playerWidth / 4, playerY + adjustedHeight);
+
+    glVertex2f(playerX + 3 * playerWidth / 4, playerY);
+    glVertex2f(playerX + 3 * playerWidth / 4, playerY + adjustedHeight);
+    // Horizontal line at mid-height
+    glVertex2f(playerX, playerY + adjustedHeight / 2);
+    glVertex2f(playerX + playerWidth, playerY + adjustedHeight / 2);
+    glEnd();
+
     // Draw head (circle)
     glColor3f(1.0f, 0.8f, 0.6f);
     DrawCircle(playerX + playerWidth / 2, playerY + adjustedHeight + 10, 10, 20);
@@ -287,6 +335,25 @@ void DrawPlayer(void)
     glVertex2f(playerX + 15, playerY + adjustedHeight + 12);
     glVertex2f(playerX + 5, playerY + adjustedHeight + 12);
     glEnd();
+
+    glColor3f(0.7f, 0.0f, 0.0f); // Red color for the hat
+    // Hat base (rectangle)
+    glBegin(GL_QUADS);
+    glVertex2f(playerX + 2, playerY + adjustedHeight + 18); // Slightly above the head
+    glVertex2f(playerX + playerWidth - 2, playerY + adjustedHeight + 18);
+    glVertex2f(playerX + playerWidth - 2, playerY + adjustedHeight + 25);
+    glVertex2f(playerX + 2, playerY + adjustedHeight + 25);
+    glEnd();
+    // Hat tip (triangle)
+    glBegin(GL_TRIANGLES);
+    glVertex2f(playerX + playerWidth / 2, playerY + adjustedHeight + 35); // Tip of the hat
+    glVertex2f(playerX + 3, playerY + adjustedHeight + 25);
+    glVertex2f(playerX + playerWidth - 3, playerY + adjustedHeight + 25);
+    glEnd();
+
+    // Add a dot on the tip of the hat
+    glColor3f(1.0f, 1.0f, 0.0f); // Yellow color for the dot
+    DrawCircle(playerX + playerWidth / 2, playerY + adjustedHeight + 35, 2, 10); // Small dot on hat tip
 
     // Draw arms
     glColor3f(0.8f, 0.5f, 0.3f); // Light brown color for arms
@@ -408,7 +475,7 @@ void drawTimer() {
 
     //----------------------------------------------
     // Draw the player's health bar
-    float maxHealth = 51.0f;  // The total health value
+    float maxHealth = 5.0f;  // The total health value
     float currentHealth = (float)playerLives;  // Use playerLives to track the current health
     float healthBarWidth = 200.0f;  // The total width of the health bar
     float healthBarHeight = 20.0f;  // The height of the health bar
@@ -466,75 +533,187 @@ void updateTimer() {
 // Draw Obstacle Function
 void DrawObstacle(void)
 {
-    // Draw first obstacle
-    glColor3f(1.0f, 0.0f, 0.0f); // Red color for the first obstacle
+    // Draw first obstacle (Curvy Cactus with Details)
+    glColor3f(0.0f, 0.7f, 0.0f); // Bright green color for the cactus base
+
+    // Draw cactus body
     glBegin(GL_QUADS);
-    glVertex2f(obstacleX, obstacleY);
-    glVertex2f(obstacleX + obstacleWidth, obstacleY);
-    glVertex2f(obstacleX + obstacleWidth, obstacleY + obstacleHeight);
-    glVertex2f(obstacleX, obstacleY + obstacleHeight);
+    glVertex2f(obstacleX + obstacleWidth / 4, obstacleY);
+    glVertex2f(obstacleX + 3 * obstacleWidth / 4, obstacleY);
+    glVertex2f(obstacleX + 3 * obstacleWidth / 4, obstacleY + obstacleHeight);
+    glVertex2f(obstacleX + obstacleWidth / 4, obstacleY + obstacleHeight);
     glEnd();
 
-    // Draw second obstacle
-    glColor3f(0.0f, 0.0f, 1.0f); // Blue color for the second obstacle
+    // Draw details on the cactus body (lines for texture)
+    glColor3f(0.0f, 0.4f, 0.0f); // Darker green for the texture
+    for (int i = 0; i < 4; i++) {
+        glBegin(GL_LINES);
+        glVertex2f(obstacleX + obstacleWidth / 4 + (obstacleWidth / 4) * (i + 1) / 4, obstacleY + obstacleHeight);
+        glVertex2f(obstacleX + obstacleWidth / 4 + (obstacleWidth / 4) * (i + 1) / 4, obstacleY);
+        glEnd();
+    }
+
+    // Draw cactus arms (using quads)
+    glColor3f(0.0f, 1.7f, 0.0f); // Bright green for arms
+    // Left arm
+    glBegin(GL_QUADS);
+    glVertex2f(obstacleX + obstacleWidth / 4 - 15, obstacleY + obstacleHeight / 2);
+    glVertex2f(obstacleX + obstacleWidth / 4, obstacleY + obstacleHeight / 2);
+    glVertex2f(obstacleX + obstacleWidth / 4, obstacleY + obstacleHeight / 2 + 40);
+    glVertex2f(obstacleX + obstacleWidth / 4 - 15, obstacleY + obstacleHeight / 2 + 40);
+    glEnd();
+
+    // Right arm
+    glBegin(GL_QUADS);
+    glVertex2f(obstacleX + 3 * obstacleWidth / 4 + 15, obstacleY + obstacleHeight / 2);
+    glVertex2f(obstacleX + 3 * obstacleWidth / 4, obstacleY + obstacleHeight / 2);
+    glVertex2f(obstacleX + 3 * obstacleWidth / 4, obstacleY + obstacleHeight / 2 + 40);
+    glVertex2f(obstacleX + 3 * obstacleWidth / 4 + 15, obstacleY + obstacleHeight / 2 + 40);
+    glEnd();
+
+    // Add texture lines for arms
+    glColor3f(0.0f, 0.4f, 0.0f);
+    for (int i = 0; i < 4; i++) {
+        glBegin(GL_LINES);
+        glVertex2f(obstacleX + obstacleWidth / 4 - 15, obstacleY + obstacleHeight / 2 + (10 * i));
+        glVertex2f(obstacleX + obstacleWidth / 4, obstacleY + obstacleHeight / 2 + (10 * i));
+        glEnd();
+    }
+
+    // Draw second obstacle (Enhanced Dirt Block with Rocks)
+    glColor3f(0.8f, 0.52f, 0.25f); // Brown color for the dirt block
     glBegin(GL_QUADS);
     glVertex2f(obstacle2X, obstacle2Y);
     glVertex2f(obstacle2X + obstacle2Width, obstacle2Y);
     glVertex2f(obstacle2X + obstacle2Width, obstacle2Y + obstacle2Height);
     glVertex2f(obstacle2X, obstacle2Y + obstacle2Height);
     glEnd();
+
+    // Add texture for the dirt block (horizontal lines)
+    glColor3f(0.5f, 0.35f, 0.2f); // Darker brown for texture
+    for (int i = 0; i < 5; i++) {
+        glBegin(GL_LINES);
+        glVertex2f(obstacle2X, obstacle2Y + (i * obstacle2Height / 5));
+        glVertex2f(obstacle2X + obstacle2Width, obstacle2Y + (i * obstacle2Height / 5));
+        glEnd();
+    }
+
+    // Draw rocks on top of the dirt block
+    glColor3f(0.5f, 0.5f, 0.5f); // Gray color for rocks
+
+    // Larger rock
+    glBegin(GL_POLYGON);
+    for (int i = 0; i < 8; i++) {
+        float angle = 2.0f * M_PI * float(i) / 8.0f; // Octagon shape
+        glVertex2f(obstacle2X + obstacle2Width / 2 + 15 * cos(angle), obstacle2Y + obstacle2Height + 15 * sin(angle));
+    }
+    glEnd();
+
+    // Smaller rock
+    glBegin(GL_POLYGON);
+    for (int i = 0; i < 6; i++) {
+        float angle = 2.0f * M_PI * float(i) / 6.0f; // Hexagon shape
+        glVertex2f(obstacle2X + 3 * obstacle2Width / 4 + 8 * cos(angle), obstacle2Y + obstacle2Height + 8 * sin(angle));
+    }
+    glEnd();
+
+    // Additional small rocks for detail
+    glColor3f(0.7f, 0.7f, 0.7f); // Lighter gray for small rocks
+    glBegin(GL_POLYGON);
+    for (int i = 0; i < 5; i++) {
+        float angle = 2.0f * M_PI * float(i) / 5.0f; // Pentagon shape
+        glVertex2f(obstacle2X + 10 + 5 * cos(angle), obstacle2Y + obstacle2Height + 5 * sin(angle));
+    }
+    glEnd();
 }
+
+
 
 void DrawCollectible(float x, float y, float radius)
 {
-    int numSegments = 30; // Number of segments for the circle
+    int numSegments = 40; // Number of segments for smoother circle
     float angleStep = 2.0f * M_PI / numSegments;
 
-    // Draw the outer edge of the coin (gold color)
+    float scaleFactor = 1.0f + 0.2f * sin(glutGet(GLUT_ELAPSED_TIME) / 200.0f);
+    glPushMatrix(); // Save the current state of the modelview matrix
+    glTranslatef(x, y, 0); // Move to the collectible's position
+    glScalef(scaleFactor, scaleFactor, 1.0f);// Rotate around Y-axis (spinning effect)
+
+    // Outer shiny ring using a gradient effect
     glBegin(GL_TRIANGLE_FAN);
-    glColor3f(1.0f, 0.84f, 0.0f); // Gold color
-    glVertex2f(x, y); // Center of the coin
+    glColor3f(1.0f, 0.9f, 0.0f); // Bright gold at the center
+    glVertex2f(0.0f, 0.0f); // Center of the coin
 
     for (int i = 0; i <= numSegments; i++)
     {
         float angle = i * angleStep;
         float dx = cos(angle) * radius;
         float dy = sin(angle) * radius;
-        glVertex2f(x + dx, y + dy);
+
+        // Gradient effect based on the segment position
+        glColor3f(0.9f + 0.1f * (i % 2), 0.7f + 0.1f * (i % 2), 0.0f); // Alternating light gold
+        glVertex2f(dx, dy);
     }
     glEnd();
 
-    // Draw the inner circle (lighter color for the shine)
-    glBegin(GL_TRIANGLE_FAN);
-    glColor3f(1.0f, 0.9f, 0.0f); // Lighter gold color
-    float innerRadius = radius * 0.8f; // Inner radius smaller than outer radius
-    glVertex2f(x, y); // Center of the inner circle
+    // Inner circle with polygonal detail
+    glBegin(GL_POLYGON);
+    glColor3f(1.0f, 0.84f, 0.0f); // Slightly darker gold
+    float innerRadius = radius * 0.8f;
 
-    for (int i = 0; i <= numSegments; i++)
+    for (int i = 0; i < 6; i++) // Hexagon shape
     {
-        float angle = i * angleStep;
+        float angle = i * M_PI / 3.0f; // 60-degree segments
         float dx = cos(angle) * innerRadius;
         float dy = sin(angle) * innerRadius;
-        glVertex2f(x + dx, y + dy);
+        glVertex2f(dx, dy);
     }
     glEnd();
+
+    // Star-like shine using lines
+    glBegin(GL_LINES);
+    glColor3f(1.0f, 1.0f, 0.8f); // Shiny white for sparkle
+    for (int i = 0; i < 8; i++) // Star with 8 rays
+    {
+        float angle = i * M_PI / 4.0f; // 45-degree increments
+        glVertex2f(0.0f, 0.0f); // Start from the center
+        glVertex2f(cos(angle) * radius * 0.7f, sin(angle) * radius * 0.7f); // Extend outward
+    }
+    glEnd();
+
+    // Outer sparkle points
+    glPointSize(5.0f); // Increase point size for sparkle effect
+    glBegin(GL_POINTS);
+    glColor3f(1.0f, 1.0f, 1.0f); // White sparkle
+    for (int i = 0; i < 5; i++)
+    {
+        float angle = i * M_PI / 2.5f; // 72-degree increments for points
+        float dx = cos(angle) * radius * 1.1f;
+        float dy = sin(angle) * radius * 1.1f;
+        glVertex2f(dx, dy);
+    }
+    glEnd();
+
+    glPopMatrix(); // Restore the modelview matrix
 }
+
+
 
 void DrawPowerUp(float x, float y, float size, int type)
 {
     glPushMatrix(); // Save the current state of the modelview matrix
     glTranslatef(x, y, 0); // Move to the power-up's position
-    glRotatef(powerUpAngle, 0.0f, 0.0f, 1.0f); // Rotate around the Z-axis
+    glRotatef(powerUpAngle, 0.0f, 0.0f, 1.0f); // Rotate around the Z-axis for spinning effect
 
     if (type == 1) {
-        // Draw invincibility power-up as a star
+        // Draw invincibility power-up as a star using triangles and lines
         glBegin(GL_TRIANGLE_FAN);
-        glColor3f(1.0f, 1.0f, 0.0f); // Yellow for invincibility
+        glColor3f(1.0f, 1.0f, 0.0f); // Bright yellow for the star
         glVertex2f(0.0f, 0.0f); // Center of the star
-        for (int i = 0; i < 5; i++)
-        {
-            float outerAngle = i * 2.0f * M_PI / 5.0f; // Outer points
-            float innerAngle = outerAngle + M_PI / 5.0f; // Inner points
+
+        for (int i = 0; i < 5; i++) {
+            float outerAngle = i * 2.0f * M_PI / 5.0f; // Outer points of the star
+            float innerAngle = outerAngle + M_PI / 5.0f; // Inner points of the star
 
             // Outer point
             glVertex2f(cos(outerAngle) * size, sin(outerAngle) * size);
@@ -542,20 +721,97 @@ void DrawPowerUp(float x, float y, float size, int type)
             glVertex2f(cos(innerAngle) * (size * 0.5f), sin(innerAngle) * (size * 0.5f));
         }
         glEnd();
+
+        glBegin(GL_QUADS);
+        glColor3f(1.0f, 0.5f, 0.0f); // Orange for the quad
+        glVertex2f(-size * 0.5f, -size * 0.5f);
+        glVertex2f(size * 0.5f, -size * 0.5f);
+        glVertex2f(size * 0.5f, size * 0.5f);
+        glVertex2f(-size * 0.5f, size * 0.5f);
+        glEnd();
+
+        // Add glowing outline using lines
+        glBegin(GL_LINE_LOOP);
+        glColor3f(1.0f, 1.0f, 0.2f); // Light yellow for glow effect
+        for (int i = 0; i < 5; i++) {
+            float outerAngle = i * 2.0f * M_PI / 5.0f;
+            glVertex2f(cos(outerAngle) * size, sin(outerAngle) * size);
+        }
+        glEnd();
+
+        // Add the edges using line strips for a cleaner look
+        glBegin(GL_LINE_STRIP);
+        glColor3f(1.0f, 0.8f, 0.0f); // A slightly darker shade for depth
+        for (int i = 0; i <= 5; i++) {
+            float angle = i * 2.0f * M_PI / 5.0f; // Create a closed shape
+            glVertex2f(cos(angle) * (size + 5.0f), sin(angle) * (size + 5.0f)); // Slightly larger for effect
+        }
+        glEnd();
+        // Add sparkle points for both power-ups to make them stand out
+        glPointSize(4.0f); // Increase point size for sparkles
+        glBegin(GL_POINTS);
+        glColor3f(1.0f, 1.0f, 1.0f); // White sparkle
+        for (int i = 0; i < 6; i++) {
+            float angle = i * M_PI / 3.0f; // Points around the power-up
+            float dx = cos(angle) * (size * 1.2f);
+            float dy = sin(angle) * (size * 1.2f);
+            glVertex2f(dx, dy); // Place the sparkle around the power-up
+        }
+        glEnd();
     }
     else if (type == 2) {
-        // Draw score multiplier power-up as a diamond
+        // Draw score multiplier power-up as a diamond using quads and lines
         glBegin(GL_QUADS);
         glColor3f(0.0f, 1.0f, 0.0f); // Green for score multiplier
-        glVertex2f(0.0f, size); // Top point
+        glVertex2f(0.0f, size);  // Top point
         glVertex2f(-size, 0.0f); // Left point
         glVertex2f(0.0f, -size); // Bottom point
-        glVertex2f(size, 0.0f); // Right point
+        glVertex2f(size, 0.0f);  // Right point
+        glEnd();
+
+        glBegin(GL_TRIANGLES);
+        glColor3f(0.0f, 0.0f, 1.0f); // Blue for the triangle
+        glVertex2f(0.0f, size * 1.2f); // Top vertex
+        glVertex2f(-size * 0.6f, -size * 0.6f); // Bottom left vertex
+        glVertex2f(size * 0.6f, -size * 0.6f); // Bottom right vertex
+        glEnd();
+
+        // Add glowing outline using lines
+        glBegin(GL_LINE_LOOP);
+        glColor3f(0.3f, 1.0f, 0.3f); // Light green for glow effect
+        glVertex2f(0.0f, size);  // Top point
+        glVertex2f(-size, 0.0f); // Left point
+        glVertex2f(0.0f, -size); // Bottom point
+        glVertex2f(size, 0.0f);  // Right point
+        glEnd();
+
+        // Adding additional edge using line strip for a more polished look
+        glBegin(GL_LINE_STRIP);
+        glColor3f(0.0f, 0.5f, 0.0f); // Darker green for depth
+        glVertex2f(0.0f, size);  // Top point
+        glVertex2f(-size, 0.0f); // Left point
+        glVertex2f(0.0f, -size); // Bottom point
+        glVertex2f(size, 0.0f);  // Right point
+        glVertex2f(0.0f, size);  // Closing the diamond shape
+        glEnd();
+        // Add sparkle points for both power-ups to make them stand out
+        glPointSize(4.0f); // Increase point size for sparkles
+        glBegin(GL_POINTS);
+        glColor3f(1.0f, 1.0f, 1.0f); // White sparkle
+        for (int i = 0; i < 6; i++) {
+            float angle = i * M_PI / 3.0f; // Points around the power-up
+            float dx = cos(angle) * (size * 1.2f);
+            float dy = sin(angle) * (size * 1.2f);
+            glVertex2f(dx, dy); // Place the sparkle around the power-up
+        }
         glEnd();
     }
 
+    
+
     glPopMatrix(); // Restore the previous state of the modelview matrix
 }
+
 
 
 void DrawPowerUpTimer() {
@@ -586,8 +842,8 @@ void handleSpeedupWithTime() {
     int elapsedTime = defaultTime - remainingTime;
 
     // Define speed increments
-    float speedIncrement = 0.0045f; // Base speed increment
-    float maxSpeed = 0.7f; // Maximum speed cap
+    float speedIncrement = 0.005f; // Base speed increment
+    float maxSpeed = 1.7f; // Maximum speed cap
 
     // Update the obstacle speed based on elapsed time
     obstacleSpeed = 0.1f + (elapsedTime * speedIncrement);
@@ -615,6 +871,8 @@ void HandleCollisions(void)
         playerCollided = false;
         collisionTimer = 0;
     }
+
+   
     // Move obstacles and power-ups
     if (!playerCollided) {
         obstacleX -= obstacleSpeed;
@@ -635,8 +893,8 @@ void HandleCollisions(void)
         obstacleX = windowWidth;
     }
     if (obstacle2X + obstacleWidth < 0) {
-        
-        obstacle2X = windowWidth + (windowWidth/2);
+
+        obstacle2X = windowWidth + (windowWidth / 2);
     }
 
     // Reset collectible and power-up positions when off-screen
@@ -645,7 +903,7 @@ void HandleCollisions(void)
         collectibleY = 200;
     }
     if (powerUpX + powerUpWidth < 0) {
-        powerUpX = windowWidth + rand() % 100 + 50;
+        powerUpX = windowWidth + rand() % 150 + 600;
         powerUpY = 200;
         powerUpType = rand() % 2 + 1; // Randomize power-up type: 1 for invincibility, 2 for score multiplier
     }
@@ -669,6 +927,7 @@ void HandleCollisions(void)
                     gameOver = true;
                 }
             }
+            PlaySoundEffect4("../../Bruh (Sound Effect) 1 second video!.wav");
         }
 
         if (playerX + playerWidth > obstacle2X && playerX < obstacle2X + obstacle2Width &&
@@ -688,15 +947,20 @@ void HandleCollisions(void)
                     gameOver = true;
                 }
             }
+            PlaySoundEffect4("../../Bruh (Sound Effect) 1 second video!.wav");
         }
     }
 
     // Collision detection for collectibles
     if (playerX + playerWidth > collectibleX && playerX < collectibleX + collectibleWidth &&
         playerY < collectibleY + collectibleHeight && playerY + playerHeight > collectibleY) {
-
+        
         playerScore += scoreMultiplier ? 200 : 100; // Double score if scoreMultiplier is active
         collectibleX = -50; // Move off-screen until reset
+        //SetVolume(0x5000);
+        PlaySoundEffect2("../../Retro Game Coin Sound Effect.wav");
+        
+        
     }
 
     // Collision detection for power-ups
@@ -712,6 +976,7 @@ void HandleCollisions(void)
 
         powerUpDuration = 5000; // Lasts for 5 seconds
         powerUpX = -50; // Move off-screen until reset
+        PlaySoundEffect3("../../MARIO POWER UP - SOUND EFFECT.wav");
     }
 
     // Handle flashing effect after collision
@@ -827,6 +1092,15 @@ void DrawBoundaries(void)
     glBegin(GL_LINES);
     glVertex2f(0, upperBoundaryY);
     glVertex2f(windowWidth, upperBoundaryY);
+    glEnd();
+
+    glPointSize(5.0f); // Set point size
+    glColor3f(1.0f, 0.0f, 0.0f); // Red color for points
+    glBegin(GL_POINTS);
+    glVertex2f(0, lowerBoundaryY); // Bottom-left corner
+    glVertex2f(windowWidth, lowerBoundaryY); // Bottom-right corner
+    glVertex2f(0, upperBoundaryY); // Top-left corner
+    glVertex2f(windowWidth, upperBoundaryY); // Top-right corner
     glEnd();
 }
 
@@ -999,6 +1273,32 @@ void DrawGameOverScreen(void)
 {
     DrawText("Game Over!", 500, windowHeight / 2 + 20);
     DrawText("Click to Restart", 450, windowHeight / 2 - 20);
+    // Display the player's score
+    char scoreText[50]; // Buffer to hold the score text
+    // Convert the score to a string manually
+    int score = playerScore; // Assuming playerScore is an integer
+    int i = 0;
+    if (score == 0) {
+        scoreText[i++] = '0'; // Handle score 0
+    }
+    else {
+        while (score > 0) {
+            scoreText[i++] = (score % 10) + '0'; // Get the last digit
+            score /= 10; // Remove the last digit
+        }
+    }
+    scoreText[i] = '\0'; // Null-terminate the string
+
+    // Reverse the score text to display it correctly
+    for (int j = 0; j < i / 2; j++) {
+        char temp = scoreText[j];
+        scoreText[j] = scoreText[i - j - 1];
+        scoreText[i - j - 1] = temp;
+    }
+
+    DrawText("Your Score: ", 450, windowHeight / 2 - 60);
+    DrawText(scoreText, 600, windowHeight / 2 - 60); // Adjust position as needed
+    
 }
 
 void DrawGameWonScreen(void) {
@@ -1031,6 +1331,7 @@ void DrawGameWonScreen(void) {
 
         DrawText("Your Score: ", 450, windowHeight / 2 - 60);
         DrawText(scoreText, 600, windowHeight / 2 - 60); // Adjust position as needed
+        
     }
 }
 
@@ -1071,7 +1372,7 @@ void DrawText(const char* text, float x, float y)
 
 // Start Game Function
 void StartGame() {
-    playerLives = 51; // Reset lives
+    playerLives = 5; // Reset lives
     playerScore = 0;
     remainingTime = 60.0f; // Reset remaining time to 60 seconds
     lastTime = glutGet(GLUT_ELAPSED_TIME); // Reset lastTime to current time
@@ -1101,6 +1402,11 @@ void Anim(void)
         powerUpAngle -= 360.0f; // Keep angle within 0 to 360 degrees
     }
 
+    collectibleAngle += 0.1f; // Increase angle for spinning (adjust speed as needed)
+    if (collectibleAngle >= 360.0f) {
+        collectibleAngle -= 360.0f; // Keep angle within 0 to 360 degrees
+    }
+
     // Update lightning effect
     lightningTimer += 0.016f; // Increment timer (assuming ~60 FPS)
     if (lightningTimer >= lightningInterval) {
@@ -1111,3 +1417,4 @@ void Anim(void)
     // Redisplay the scene
     glutPostRedisplay(); // Mark the current window as needing to be redrawn
 }
+

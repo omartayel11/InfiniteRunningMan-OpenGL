@@ -24,10 +24,22 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Media Include="..\..\game-start-6104.wav">
+    <Media Include="..\..\Wii Music - Gaming Background Music (HD).wav">
       <Filter>Source Files</Filter>
     </Media>
-    <Media Include="..\..\Super Mario Bros. Theme Song.wav">
+    <Media Include="..\..\Retro Game Coin Sound Effect.wav">
+      <Filter>Source Files</Filter>
+    </Media>
+    <Media Include="..\..\MARIO POWER UP - SOUND EFFECT.wav">
+      <Filter>Source Files</Filter>
+    </Media>
+    <Media Include="..\..\Bruh (Sound Effect) 1 second video!.wav">
+      <Filter>Source Files</Filter>
+    </Media>
+    <Media Include="..\..\WIN sound effect no copyright.wav">
+      <Filter>Source Files</Filter>
+    </Media>
+    <Media Include="..\..\Game Over sound effect.wav">
       <Filter>Source Files</Filter>
     </Media>
   </ItemGroup>

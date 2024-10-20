@@ -86,8 +86,12 @@
     <ClCompile Include="OpenGL2DTemplate.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Media Include="..\..\game-start-6104.wav" />
-    <Media Include="..\..\Super Mario Bros. Theme Song.wav" />
+    <Media Include="..\..\Bruh (Sound Effect) 1 second video!.wav" />
+    <Media Include="..\..\Game Over sound effect.wav" />
+    <Media Include="..\..\MARIO POWER UP - SOUND EFFECT.wav" />
+    <Media Include="..\..\Retro Game Coin Sound Effect.wav" />
+    <Media Include="..\..\Wii Music - Gaming Background Music (HD).wav" />
+    <Media Include="..\..\WIN sound effect no copyright.wav" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
